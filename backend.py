@@ -12,7 +12,8 @@ from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
+# from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
 
@@ -113,7 +114,7 @@ class State(TypedDict):
 # -----------------------------
 # 2) LLM
 # -----------------------------
-llm = ChatOpenAI(model="gpt-4.1-mini")
+llm = ChatGroq(model="llama-3.3-70b-versatile",temperature=0)
 
 # -----------------------------
 # 3) Router
