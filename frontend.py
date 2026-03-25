@@ -12,15 +12,10 @@ from typing import Any, Dict, Optional, List, Iterator, Tuple
 import pandas as pd
 import streamlit as st
 
-# -----------------------------
-# Import your compiled LangGraph app
-# -----------------------------
+
 from backend import app
 
 
-# -----------------------------
-# Helpers
-# -----------------------------
 def safe_slug(title: str) -> str:
     s = title.strip().lower()
     s = re.sub(r"[^a-z0-9 _-]+", "", s)
@@ -88,9 +83,7 @@ def extract_latest_state(current_state: Dict[str, Any], step_payload: Any) -> Di
     return current_state
 
 
-# -----------------------------
-# Markdown renderer that supports local images
-# -----------------------------
+
 _MD_IMG_RE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)")
 _CAPTION_LINE_RE = re.compile(r"^\*(?P<cap>.+)\*$")
 
@@ -156,9 +149,7 @@ def render_markdown_with_local_images(md: str):
         i += 1
 
 
-# -----------------------------
-# ✅ NEW: Past blogs helpers
-# -----------------------------
+
 def list_past_blogs() -> List[Path]:
     """
     Returns .md files in current working directory, newest first.
@@ -185,9 +176,6 @@ def extract_title_from_md(md: str, fallback: str) -> str:
     return fallback
 
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
 st.set_page_config(page_title="LangGraph Blog Writer", layout="wide")
 
 st.title("Blog Writing Agent")
@@ -199,9 +187,9 @@ with st.sidebar:
         height=120,
     )
     as_of = st.date_input("As-of date", value=date.today())
-    run_btn = st.button("🚀 Generate Blog", type="primary")
+    run_btn = st.button(" Generate Blog", type="primary")
 
-    # ✅ NEW: Past blogs list (keeps everything else intact)
+    
     st.divider()
     st.subheader("Past blogs")
 
@@ -210,7 +198,7 @@ with st.sidebar:
         st.caption("No saved blogs found (*.md in current folder).")
         selected_md_file = None
     else:
-        # Build labels from file name + (optional) parsed title
+        
         options: List[str] = []
         file_by_label: Dict[str, Path] = {}
         for p in past_files[:50]:
@@ -231,33 +219,33 @@ with st.sidebar:
         )
         selected_md_file = file_by_label.get(selected_label)
 
-        if st.button("📂 Load selected blog"):
+        if st.button(" Load selected blog"):
             if selected_md_file:
                 md_text = read_md_file(selected_md_file)
-                # Load into session_state as if it were a run output
+                
                 st.session_state["last_out"] = {
-                    "plan": None,          # old files don't include plan
-                    "evidence": [],        # old files don't include evidence
-                    "image_specs": [],     # optional (not persisted)
-                    "final": md_text,      # markdown body
+                    "plan": None,         
+                    "evidence": [],        
+                    "image_specs": [],     
+                    "final": md_text,      
                 }
-                # also update the topic input to the title (best-effort) without changing UI
+                
                 st.session_state["topic_prefill"] = extract_title_from_md(md_text, selected_md_file.stem)
 
     
 
-# Keep your topic input as-is; optionally prefill for next run after loading a blog
+
 if "topic_prefill" in st.session_state and isinstance(st.session_state["topic_prefill"], str):
-    # Do not mutate widgets; just keep as a hint.
+   
     pass
 
-# Storage for latest run
+
 if "last_out" not in st.session_state:
     st.session_state["last_out"] = None
 
-# Layout
+
 tab_plan, tab_evidence, tab_preview, tab_images, tab_logs = st.tabs(
-    ["🧩 Plan", "🔎 Evidence", "📝 Markdown Preview", "🖼️ Images", "🧾 Logs"]
+    ["Plan", "Evidence", " Markdown Preview", "Images", " Logs"]
 )
 
 logs: List[str] = []
@@ -300,7 +288,7 @@ if run_btn:
             if isinstance(payload, dict) and len(payload) == 1 and isinstance(next(iter(payload.values())), dict):
                 node_name = next(iter(payload.keys()))
             if node_name and node_name != last_node:
-                status.write(f"➡️ Node: `{node_name}`")
+                status.write(f" Node: `{node_name}`")
                 last_node = node_name
 
             current_state = extract_latest_state(current_state, payload)
@@ -321,13 +309,13 @@ if run_btn:
         elif kind == "final":
             out = payload
             st.session_state["last_out"] = out
-            status.update(label="✅ Done", state="complete", expanded=False)
+            status.update(label="Done", state="complete", expanded=False)
             log("[final] received final state")
 
-# Render last result (if any)
+
 out = st.session_state.get("last_out")
 if out:
-    # --- Plan tab ---
+   
     with tab_plan:
         st.subheader("Plan")
         plan_obj = out.get("plan")
@@ -368,7 +356,7 @@ if out:
                 with st.expander("Task details"):
                     st.json(tasks)
 
-    # --- Evidence tab ---
+    
     with tab_evidence:
         st.subheader("Evidence")
         evidence = out.get("evidence") or []
@@ -389,7 +377,7 @@ if out:
                 )
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    # --- Preview tab ---
+    
     with tab_preview:
         st.subheader("Markdown Preview")
         final_md = out.get("final") or ""
@@ -404,12 +392,12 @@ if out:
             elif isinstance(plan_obj, dict):
                 blog_title = plan_obj.get("blog_title", "blog")
             else:
-                # fallback: parse from markdown title
+                
                 blog_title = extract_title_from_md(final_md, "blog")
 
             md_filename = f"{safe_slug(blog_title)}.md"
             st.download_button(
-                "⬇️ Download Markdown",
+                "⬇Download Markdown",
                 data=final_md.encode("utf-8"),
                 file_name=md_filename,
                 mime="text/markdown",
@@ -417,13 +405,13 @@ if out:
 
             bundle = bundle_zip(final_md, md_filename, Path("images"))
             st.download_button(
-                "📦 Download Bundle (MD + images)",
+                "Download Bundle (MD + images)",
                 data=bundle,
                 file_name=f"{safe_slug(blog_title)}_bundle.zip",
                 mime="application/zip",
             )
 
-    # --- Images tab ---
+   
     with tab_images:
         st.subheader("Images")
         specs = out.get("image_specs") or []
@@ -453,7 +441,7 @@ if out:
                         mime="application/zip",
                     )
 
-    # --- Logs tab ---
+    
     with tab_logs:
         st.subheader("Logs")
         if "logs" not in st.session_state:

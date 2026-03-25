@@ -19,16 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ============================================================
-# Blog Writer (Router → (Research?) → Orchestrator → Workers → ReducerWithImages)
-# Patches image capability using your 3-node reducer flow:
-#   merge_content -> decide_images -> generate_and_place_images
-# ============================================================
 
-
-# -----------------------------
-# 1) Schemas
-# -----------------------------
 class Task(BaseModel):
     id: int
     title: str
@@ -54,7 +45,7 @@ class Plan(BaseModel):
 class EvidenceItem(BaseModel):
     title: str
     url: str
-    published_at: Optional[str] = None  # ISO "YYYY-MM-DD" preferred
+    published_at: Optional[str] = None  
     snippet: Optional[str] = None
     source: Optional[str] = None
 
@@ -71,7 +62,7 @@ class EvidencePack(BaseModel):
     evidence: List[EvidenceItem] = Field(default_factory=list)
 
 
-# ---- Image planning schema (ported from your image flow) ----
+
 class ImageSpec(BaseModel):
     placeholder: str = Field(..., description="e.g. [[IMAGE_1]]")
     filename: str = Field(..., description="Save under images/, e.g. qkv_flow.png")
@@ -111,14 +102,10 @@ class State(TypedDict):
     final: str
 
 
-# -----------------------------
-# 2) LLM
-# -----------------------------
-llm = ChatGroq(model="llama-3.3-70b-versatile",temperature=0)
 
-# -----------------------------
-# 3) Router
-# -----------------------------
+llm = # (specify your LLM model here)
+
+
 ROUTER_SYSTEM = """You are a routing module for a technical blog planner.
 
 Decide whether web research is needed BEFORE planning.
@@ -159,9 +146,7 @@ def router_node(state: State) -> dict:
 def route_next(state: State) -> str:
     return "research" if state["needs_research"] else "orchestrator"
 
-# -----------------------------
-# 4) Research (Tavily)
-# -----------------------------
+
 def _tavily_search(query: str, max_results: int = 5) -> List[dict]:
     if not os.getenv("TAVILY_API_KEY"):
         return []
@@ -240,9 +225,7 @@ def research_node(state: State) -> dict:
 
     return {"evidence": evidence}
 
-# -----------------------------
-# 5) Orchestrator (Plan)
-# -----------------------------
+
 ORCH_SYSTEM = """You are a senior technical writer and developer advocate.
 Produce a highly actionable outline for a technical blog post.
 
@@ -288,9 +271,6 @@ def orchestrator_node(state: State) -> dict:
     return {"plan": plan}
 
 
-# -----------------------------
-# 6) Fanout
-# -----------------------------
 def fanout(state: State):
     assert state["plan"] is not None
     return [
@@ -309,9 +289,7 @@ def fanout(state: State):
         for task in state["plan"].tasks
     ]
 
-# -----------------------------
-# 7) Worker
-# -----------------------------
+
 WORKER_SYSTEM = """You are a senior technical writer and developer advocate.
 Write ONE section of a technical blog post in Markdown.
 
@@ -374,10 +352,7 @@ def worker_node(payload: dict) -> dict:
 
     return {"sections": [(task.id, section_md)]}
 
-# ============================================================
-# 8) ReducerWithImages (subgraph)
-#    merge_content -> decide_images -> generate_and_place_images
-# ============================================================
+
 def merge_content(state: State) -> dict:
     plan = state["plan"]
     if plan is None:
@@ -455,7 +430,7 @@ def _gemini_generate_image_bytes(prompt: str) -> bytes:
         ),
     )
 
-    # Depending on SDK version, parts may hang off resp.candidates[0].content.parts
+   
     parts = getattr(resp, "parts", None)
     if not parts and getattr(resp, "candidates", None):
         try:
@@ -488,7 +463,7 @@ def generate_and_place_images(state: State) -> dict:
     md = state.get("md_with_placeholders") or state["merged_md"]
     image_specs = state.get("image_specs", []) or []
 
-    # If no images requested, just write merged markdown
+    
     if not image_specs:
         filename = f"{_safe_slug(plan.blog_title)}.md"
         Path(filename).write_text(md, encoding="utf-8")
@@ -502,13 +477,13 @@ def generate_and_place_images(state: State) -> dict:
         filename = spec["filename"]
         out_path = images_dir / filename
 
-        # generate only if needed
+        
         if not out_path.exists():
             try:
                 img_bytes = _gemini_generate_image_bytes(spec["prompt"])
                 out_path.write_bytes(img_bytes)
             except Exception as e:
-                # graceful fallback: keep doc usable
+                
                 prompt_block = (
                     f"> **[IMAGE GENERATION FAILED]** {spec.get('caption','')}\n>\n"
                     f"> **Alt:** {spec.get('alt','')}\n>\n"
@@ -525,7 +500,7 @@ def generate_and_place_images(state: State) -> dict:
     Path(filename).write_text(md, encoding="utf-8")
     return {"final": md}
 
-# build reducer subgraph
+
 reducer_graph = StateGraph(State)
 reducer_graph.add_node("merge_content", merge_content)
 reducer_graph.add_node("decide_images", decide_images)
@@ -536,9 +511,7 @@ reducer_graph.add_edge("decide_images", "generate_and_place_images")
 reducer_graph.add_edge("generate_and_place_images", END)
 reducer_subgraph = reducer_graph.compile()
 
-# -----------------------------
-# 9) Build main graph
-# -----------------------------
+
 g = StateGraph(State)
 g.add_node("router", router_node)
 g.add_node("research", research_node)
